@@ -1,0 +1,80 @@
+// lib/screens/asuntos_tab.dart
+import 'package:flutter/material.dart';
+
+import '../models/asunto.dart';
+import '../services/asunto_service.dart';
+import '../theme/design_tokens.dart';
+import '../widgets/empty_state.dart';
+import '../widgets/nuevo_asunto_dialog.dart';
+import 'asunto_detail_screen.dart';
+
+class AsuntosTab extends StatelessWidget {
+  const AsuntosTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Asuntos'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: () async {
+              final id = await mostrarDialogoNuevoAsunto(context);
+              if (id != null && context.mounted) Navigator.of(context).push(MaterialPageRoute(builder: (_) => AsuntoDetailScreen(asuntoId: id)));
+            },
+          ),
+        ],
+      ),
+      body: StreamBuilder<List<Asunto>>(
+        stream: AsuntoService.streamAsuntos(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          final asuntos = snapshot.data!;
+          final abiertos = asuntos.where((a) => a.estado != EstadoAsunto.cerrado).toList();
+          final cerrados = asuntos.where((a) => a.estado == EstadoAsunto.cerrado).toList();
+
+          if (asuntos.isEmpty) {
+            return const EmptyState(
+              icon: Icons.work_outline,
+              title: 'No tienes asuntos abiertos',
+              description: 'Un asunto agrupa documentos, tareas y evidencias de una misma gestión: una compra, una incidencia, una renovación...',
+            );
+          }
+
+          return ListView(
+            padding: const EdgeInsets.all(VenceSpace.s4),
+            children: [
+              for (final a in abiertos) _AsuntoTile(asunto: a),
+              if (cerrados.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text('Cerrados', style: TextStyle(color: context.colors.inkMuted, fontWeight: FontWeight.w600)),
+                for (final a in cerrados) Opacity(opacity: 0.7, child: _AsuntoTile(asunto: a)),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _AsuntoTile extends StatelessWidget {
+  const _AsuntoTile({required this.asunto});
+  final Asunto asunto;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        title: Text(asunto.titulo, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Text(asunto.tipo.etiqueta),
+        trailing: Chip(
+          label: Text(asunto.estado.etiqueta, style: const TextStyle(fontSize: 11)),
+          backgroundColor: asunto.estado == EstadoAsunto.bloqueado ? context.colors.error.withValues(alpha: 0.15) : null,
+        ),
+        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AsuntoDetailScreen(asuntoId: asunto.id))),
+      ),
+    );
+  }
+}

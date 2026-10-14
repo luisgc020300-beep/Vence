@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "583412490851",
+    "project_id": "vence-sixapp",
+    "storage_bucket": "vence-sixapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:583412490851:android:3ed65ec8d1e09362318e56",
+        "android_client_info": {
+          "package_name": "com.sixapp.vence"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDEZDuXvkHwryCYHUpz2WmPrLXmCqXEhR0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

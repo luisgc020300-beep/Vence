@@ -1,0 +1,58 @@
+rules_version = '2';
+
+// Vence es una app personal -- sin "casa" compartida como Repara/Convive.
+// Todo cuelga de users/{uid}; nadie más que el propio usuario lee o
+// escribe sus datos. La única regla con lógica propia es la de asuntos:
+// no se puede marcar como completado/cerrado sin un criterio de cierre
+// explícito (igual que el trigger de Postgres de la versión web).
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function esPropietario(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function noCierraSinCriterio() {
+      let estadoNuevo = request.resource.data.estado;
+      let criterio = request.resource.data.get('criterioCierre', '');
+      return !(estadoNuevo in ['completado', 'cerrado']) || criterio.size() > 0;
+    }
+
+    match /users/{uid} {
+      allow read, write: if esPropietario(uid);
+
+      match /documentos/{docId} {
+        allow read, write: if esPropietario(uid);
+
+        match /campos/{fieldId} {
+          allow read, write: if esPropietario(uid);
+        }
+      }
+
+      match /eventos/{eventId} {
+        allow read, write: if esPropietario(uid);
+      }
+
+      match /asuntos/{asuntoId} {
+        allow read, create, delete: if esPropietario(uid);
+        allow update: if esPropietario(uid) && noCierraSinCriterio();
+
+        match /documentos/{docId} {
+          allow read, write: if esPropietario(uid);
+        }
+
+        match /actividad/{actId} {
+          allow read, write: if esPropietario(uid);
+        }
+      }
+
+      match /conversaciones/{convId} {
+        allow read, write: if esPropietario(uid);
+
+        match /mensajes/{msgId} {
+          allow read, write: if esPropietario(uid);
+        }
+      }
+    }
+  }
+}

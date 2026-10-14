@@ -2,120 +2,84 @@
 
 > «Vence se ocupa de tus documentos y te ayuda a que no se te escape nada importante.»
 
-Gestión administrativa personal con IA: sube facturas, garantías, contratos, seguros o
-suscripciones; Vence extrae los datos importantes, propone recordatorios y responde
-preguntas sobre tus documentos citando siempre la fuente.
+App móvil (Flutter + Firebase) de gestión administrativa personal con IA: sube facturas,
+garantías, contratos, seguros o suscripciones; Vence extrae los datos importantes, propone
+recordatorios, y organiza todo alrededor de **Asuntos** (una compra, una incidencia, una
+renovación...) en vez de solo archivar documentos sueltos.
+
+Hermana de Repara/Convive/VecindApp — mismo stack, mismo flujo de trabajo (GitHub Actions
+compila el `.ipa`, se instala en el iPhone con Sideloadly).
 
 ## Stack
 
-- **Next.js 16** (App Router, React 19, TypeScript) — web responsive, sidebar en escritorio y barra inferior en móvil.
-- **Supabase** — Postgres (con Row Level Security por usuario), Auth (enlace de acceso por email, sin contraseñas) y Storage (bucket privado `documents`).
-- **Anthropic Claude** (`@anthropic-ai/sdk`) — análisis de documentos (PDF/imagen) y asistente conversacional. **Opcional**: sin clave configurada, la app funciona en **modo demostración** con una capa de servicio intercambiable (`src/lib/ai/`) que nunca presenta datos de ejemplo como si fueran un análisis real.
-- **Tailwind CSS v4** — tokens de color centralizados en `src/app/globals.css` (paleta: azul noche, azul principal, lavanda, ámbar, verde, rojo de alerta).
+- **Flutter** (Dart) — iOS y Android desde un único código.
+- **Firebase**: Firestore (`europe-west1`), Auth (email/contraseña), Storage, Cloud Functions, Crashlytics, App Check (modo Monitor).
+- **Anthropic Claude** (vía Cloud Functions, nunca desde el cliente) — análisis de documentos, asistente, borradores de comunicación. **Opcional**: sin clave real configurada, las funciones devuelven un modo demostración determinista, siempre etiquetado como tal.
 
 ## Puesta en marcha
 
-### 1. Clona dependencias
+```bash
+cd c:\dev\vence
+flutter pub get
+flutter run
+```
+
+El proyecto Firebase (`vence-sixapp`) y `lib/firebase_options.dart`/`android/app/google-services.json` ya están configurados — no hace falta `flutterfire configure` de nuevo salvo que cambies de proyecto.
+
+### Clave de Anthropic (opcional)
+
+Por defecto las Cloud Functions están en modo demostración. Para activar el análisis real:
 
 ```bash
-npm install
+cd functions
+firebase functions:secrets:set ANTHROPIC_API_KEY --project=vence-sixapp
+firebase deploy --only functions --project=vence-sixapp
 ```
 
-### 2. Crea el proyecto Supabase (gratis, sin tarjeta)
+## Modelo de datos (Firestore)
 
-1. Entra en [supabase.com](https://supabase.com) y crea un proyecto nuevo (elige la región más cercana).
-2. En **Project Settings → API**, copia `Project URL`, `anon public key` y `service_role key`.
-3. En **Authentication → URL Configuration**, añade `http://localhost:3000/auth/callback` a las Redirect URLs (y la URL de producción cuando despliegues).
-4. Ejecuta la migración inicial (crea las tablas, las políticas de RLS y el bucket de Storage):
-
-   ```bash
-   npx supabase login
-   npx supabase link --project-ref <tu-project-ref>
-   npx supabase db push
-   ```
-
-   (Alternativa sin CLI: pega el contenido de `supabase/migrations/0001_init.sql` en el **SQL Editor** del dashboard de Supabase y ejecútalo.)
-
-### 3. Variables de entorno
-
-Copia `.env.example` a `.env.local` y rellena:
-
-```bash
-cp .env.example .env.local
-```
+Todo cuelga de `users/{uid}` — app personal, sin "casa" compartida:
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...      # nunca lo expongas al cliente
-ANTHROPIC_API_KEY=...              # opcional — sin esto, modo demostración
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
+users/{uid}
+  documentos/{docId}            -- categoría, estado, resumen, eventosPropuestos[], asuntoIds[]
+    campos/{campoId}            -- dato extraído: clave, valor, confianza, estado (detectado/confirmado/corregido)
+  eventos/{eventId}             -- recordatorio/tarea, opcionalmente ligado a un documento y/o asunto
+  asuntos/{asuntoId}            -- la unidad de trabajo real: estado, objetivo, criterioCierre
+    documentos/{docId}          -- vínculo a un documento (rol: documento | evidencia)
+    actividad/{actId}           -- cronología (creado, documento añadido, cambio de estado, nota, borrador)
+  conversaciones/{convId}
+    mensajes/{msgId}            -- rol, contenido, fuentes citadas, modo (demo/real)
 ```
 
-### 4. Arranca
+`firestore.rules` exige `request.auth.uid == uid` en todo, y bloquea marcar un asunto como
+`completado`/`cerrado` sin `criterioCierre` explícito.
 
-```bash
-npm run dev
-```
+## Cloud Functions
 
-Abre `http://localhost:3000`, introduce tu email y entra con el enlace que recibirás por correo (Supabase lo envía automáticamente, incluso en el plan gratuito).
-
-## Principio de producto: Asuntos, no solo documentos
-
-Vence no es un archivador. Un **Asunto** (`asuntos`) es la unidad de trabajo real —
-"la lavadora que se ha roto", "la devolución del pedido X"— con estado, objetivo,
-documentos y evidencias vinculadas, próximos pasos (tareas) y una cronología de
-actividad. Un documento puede pertenecer a varios asuntos (p. ej. una factura
-usada en una compra y, más tarde, en una incidencia).
-
-Estados de un asunto: `nuevo → necesita_revision/en_curso → pendiente_usuario/
-pendiente_tercero/bloqueado → listo_para_accion → completado → cerrado` (con
-`reabierto` disponible siempre). Las transiciones incoherentes están bloqueadas
-en servidor (`ASUNTO_TRANSICIONES` + `changeEstado`), y **no se puede completar
-ni cerrar un asunto sin un criterio de cierre explícito** — lo impone un trigger
-de Postgres (`check_asunto_cierre`), no solo la interfaz.
+- `analizarDocumento` — descarga el archivo de Storage, lo manda a Claude (tool-use forzado para extracción JSON fiable) o devuelve un análisis de demostración si no hay clave real.
+- `pedirAsistente` — responde solo con el contexto de documentos/eventos que el cliente adjunta (ya leído con las reglas normales de Firestore), nunca con conocimiento externo.
+- `generarBorrador` — prepara un borrador de comunicación (reclamación, solicitud...). **Nunca se envía nada automáticamente.**
 
 ## Qué funciona de verdad ahora mismo
 
-- **Autenticación real** (enlace de acceso por email vía Supabase Auth) con aislamiento de datos por usuario (RLS en todas las tablas).
-- **Subida de documentos** (PDF/JPG/PNG/WEBP, máx. 15 MB) a un bucket privado de Storage, o **alta manual** sin archivo.
-- **Análisis automático**: con `ANTHROPIC_API_KEY` configurada, Claude lee el PDF/imagen de verdad (vía tool-use forzado, para una extracción JSON fiable) y propone categoría, campos y recordatorios con su propio razonamiento de fecha explícita/calculada/sugerida. Sin clave, un analizador de demostración determinista genera datos de ejemplo **siempre etiquetados como tal** en la interfaz.
-- **Bandeja de revisión**: cada dato extraído tiene estado `detectado → confirmado/corregido`; los recordatorios propuestos se aprueban o descartan uno a uno antes de convertirse en tareas reales.
-- **Motor de Asuntos**: crear un asunto desde un documento o desde cero, vincular más documentos/evidencias, crear tareas vinculadas, avanzar el estado (con bloqueo de transiciones incoherentes y criterio de cierre obligatorio), cronología de actividad auditable, y un generador de **borradores de comunicación con IA** (reclamaciones, solicitudes) que **nunca se envían solos** — quedan para que el usuario los revise y los envíe por su cuenta.
-- **Calendario**: recordatorios agrupados por mes, con completar/posponer/cancelar y creación manual de tareas (sueltas o vinculadas a un asunto).
-- **Asistente**: responde solo con el contexto real de tus documentos/eventos (nunca con conocimiento externo), cita las fuentes y marca `confident: false` cuando no tiene datos suficientes. En modo demostración responde con reglas simples sobre tus datos reales, no con un modelo.
-- **Perfil**: preferencias de notificación, exportación completa de datos (JSON) y eliminación de cuenta (borra Storage + fila de Auth, con cascada sobre el resto de tablas).
-- **Persistencia real**: todo sobrevive a recarga y a una nueva sesión (Postgres, no `localStorage`).
+- Autenticación real (email/contraseña) con aislamiento de datos por usuario.
+- Subida de documentos (cámara/galería/PDF) o alta manual sin archivo.
+- Bandeja de revisión: campos editables con estado detectado→confirmado/corregido.
+- Motor de Asuntos: crear desde un documento o desde cero, vincular documentos/evidencias, tareas, cambio de estado con transiciones validadas y cierre que exige criterio, cronología, generador de borradores.
+- Calendario agrupado por mes con completar/posponer/cancelar.
+- Asistente con fuentes citadas.
+- Perfil: exportar datos (comparte un JSON), cerrar sesión, eliminar cuenta.
 
-## Archivos principales
+## Limitaciones conocidas
 
-```
-supabase/migrations/0001_init.sql   # documentos, campos extraídos, eventos, RLS + bucket de Storage
-supabase/migrations/0002_asuntos.sql # motor de Asuntos: tabla, cronología, trigger de cierre, asunto_id en events
-src/lib/db/types.ts                 # tipos de la base de datos (a mano; regenerable con supabase gen types)
-src/lib/ai/                         # capa de IA intercambiable (demo/real) — analizador de documentos, asistente, redactor de borradores
-src/lib/server/documents.ts         # lógica de subida, análisis y alta manual
-src/lib/server/asuntos.ts           # crear asunto, vincular documento/evidencia, cambiar estado (con validación de transición + criterio de cierre)
-src/lib/supabase/{client,server,middleware}.ts  # clientes Supabase (browser/servidor/sesión)
-src/app/(app)/                      # Inicio, Documentos, Calendario, Asistente, Perfil + Asuntos (accesible desde Inicio/Documentos, sin pestaña propia)
-src/app/api/                        # rutas de documentos, asuntos, eventos, asistente y cuenta
-src/components/                     # navegación (sidebar/bottom nav), UI compartida, diálogos
-```
+- Sin notificaciones push todavía (no hay FCM conectado en esta primera versión).
+- El asistente usa los últimos ~40 documentos/60 eventos como contexto, sin búsqueda semántica.
+- Sin pruebas automatizadas de los servicios Firestore/Functions todavía (solo un smoke test de tema).
+- "Eliminar cuenta" borra el usuario de Auth pero no limpia en cascada sus documentos/Storage — pendiente de una Cloud Function de borrado.
 
-## Diagnóstico honesto / limitaciones conocidas (pendientes, no ocultas)
+## Próximos pasos de mayor valor
 
-- **Nada de esto se ha probado en ejecución real todavía**: no hay proyecto Supabase conectado en este entorno (solo placeholders en `.env.local` para poder compilar). `tsc`, `eslint` y `next build` pasan limpios; falta la prueba manual guiada con un proyecto real.
-- **Cero pruebas automatizadas**: el prompt de producto pide una matriz extensa (documentos, asuntos, fechas, automatizaciones, seguridad). No existe ninguna todavía — no se afirma que "todo esté probado".
-- **Sin investigación de mercado/competencia ni modelo de negocio**: sección pendiente del brief, requiere búsqueda web dedicada y no se ha hecho.
-- **Sin métricas de producto instrumentadas** (tiempo de captura a revisión, % de campos corregidos, etc.).
-- **Automatización de un solo nivel**: solo existen las propuestas de la sección "Nivel 1" (clasificar, sugerir campos/fechas/tareas, generar un borrador). No hay disparadores automáticos por eventos, reintentos ni ejecución de integraciones externas (Nivel 2/3 del brief) — intencionadamente, para no simular algo que no existe.
-- **Sin búsqueda semántica**: el asistente usa los últimos documentos/eventos del usuario como contexto (hasta 40/60), no embeddings. Con un archivo grande, esto no escala — el siguiente paso natural es `pgvector` en Supabase.
-- **Sin importación de correo ni calendarios externos** (Fase 2/3 de integraciones del brief, no iniciada).
-- **Notificaciones por email**: el perfil permite configurar preferencias, pero no hay ningún envío automático todavía — falta un cron/Edge Function en Supabase. No se afirma en ningún sitio de la UI que se envíen.
-- **Vista de calendario**: es una lista cronológica agrupada por mes, no una cuadrícula mensual interactiva.
-
-## Próximos tres pasos de mayor valor
-
-1. **Probar de verdad contra un proyecto Supabase real** — crear el proyecto, ejecutar las migraciones, recorrer el flujo completo descrito en la sección 7 (compra → asunto → documentos → tarea → borrador → cierre) y corregir lo que falle. Todo lo construido hasta ahora solo ha pasado comprobaciones estáticas.
-2. **Primera pasada de pruebas automatizadas** — al menos los casos de la sección 17 más críticos: aislamiento de datos entre usuarios (RLS), no poder cerrar un asunto sin criterio, transición de estado inválida rechazada.
-3. **Notificaciones reales + búsqueda semántica (`pgvector`)** — son los dos huecos que más limitan que el producto funcione sin supervisión constante del usuario.
+1. Notificaciones push (FCM) para los vencimientos próximos.
+2. Cloud Function `eliminarCuenta` que limpie Firestore + Storage en cascada.
+3. Pruebas del emulador de Firestore para las reglas de seguridad y la validación de cierre de asuntos.
