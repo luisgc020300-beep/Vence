@@ -38,17 +38,23 @@ class _DocumentosTabState extends State<DocumentosTab> {
                 ...CategoriaDocumento.values.map((c) => PopupMenuItem(value: c, child: Text(c.etiqueta))),
               ],
             ),
-            child: Container(
+            floatingCard: Container(
+              height: 50,
               padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(color: context.colors.surface, borderRadius: BorderRadius.circular(VenceRadius.sm)),
+              decoration: BoxDecoration(
+                color: context.colors.surface,
+                borderRadius: BorderRadius.circular(VenceRadius.md),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, 4))],
+              ),
               child: TextField(
                 decoration: const InputDecoration(hintText: 'Buscar...', prefixIcon: Icon(Icons.search), border: InputBorder.none),
                 onChanged: (v) => setState(() => _busqueda = v.toLowerCase()),
               ),
             ),
           ),
+          const SizedBox(height: CurvedHeader.floatingCardSpacing),
           Padding(
-            padding: const EdgeInsets.all(VenceSpace.s4),
+            padding: const EdgeInsets.fromLTRB(VenceSpace.s4, 0, VenceSpace.s4, VenceSpace.s4),
             child: StreamBuilder<List<Documento>>(
               stream: DocumentoService.streamDocumentos(),
               builder: (context, snapshot) {

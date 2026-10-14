@@ -42,7 +42,7 @@ class _CalendarioTabState extends State<CalendarioTab> {
               CurvedHeader(
                 titulo: 'Calendario',
                 trailing: HeaderIconButton(icon: Icons.add, onTap: () => showDialog(context: context, builder: (_) => const _NuevaTareaDialog())),
-                child: Row(
+                floatingCard: Row(
                   children: [
                     StatCard(icon: Icons.event_outlined, etiqueta: 'Este mes', valor: '${delMes.length}'),
                     const SizedBox(width: VenceSpace.s3),
@@ -50,8 +50,9 @@ class _CalendarioTabState extends State<CalendarioTab> {
                   ],
                 ),
               ),
+              const SizedBox(height: CurvedHeader.floatingCardSpacing),
               Padding(
-                padding: const EdgeInsets.all(VenceSpace.s4),
+                padding: const EdgeInsets.fromLTRB(VenceSpace.s4, 0, VenceSpace.s4, VenceSpace.s4),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -59,8 +60,8 @@ class _CalendarioTabState extends State<CalendarioTab> {
                     const SizedBox(height: 12),
                     _GridMes(mes: _mesVisible, eventos: delMes),
                     const SizedBox(height: VenceSpace.s5),
-                    Text('Pendientes', style: TextStyle(fontWeight: FontWeight.w700, color: context.colors.ink)),
-                    const SizedBox(height: 8),
+                    Text('Pendientes', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17, color: context.colors.ink)),
+                    const SizedBox(height: 12),
                     if (pendientes.isEmpty)
                       const EmptyState(icon: Icons.calendar_month_outlined, title: 'No tienes vencimientos pendientes', description: 'Los que detectemos en tus documentos, o que crees a mano, aparecerán aquí.')
                     else
@@ -129,8 +130,12 @@ class _GridMes extends StatelessWidget {
     final diasConEvento = eventos.map((e) => e.fecha.day).toSet();
 
     return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: context.colors.surface, borderRadius: BorderRadius.circular(VenceRadius.md)),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(VenceRadius.lg),
+        boxShadow: [BoxShadow(color: context.colors.ink.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4))],
+      ),
       child: Column(
         children: [
           Row(

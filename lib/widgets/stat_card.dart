@@ -18,8 +18,12 @@ class StatCard extends StatelessWidget {
     final tono = color ?? context.colors.brand;
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: context.colors.surface, borderRadius: BorderRadius.circular(VenceRadius.md)),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(VenceRadius.lg),
+          boxShadow: [BoxShadow(color: context.colors.ink.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, 6))],
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -32,7 +36,7 @@ class StatCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(etiqueta, style: TextStyle(fontSize: 11.5, color: context.colors.inkMuted)),
             const SizedBox(height: 2),
-            Text(valor, style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700, color: context.colors.ink)),
+            Text(valor, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: context.colors.ink)),
           ],
         ),
       ),

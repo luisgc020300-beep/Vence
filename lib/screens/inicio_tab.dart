@@ -45,7 +45,7 @@ class InicioTab extends StatelessWidget {
                       icon: Icons.settings_outlined,
                       onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
                     ),
-                    child: Row(
+                    floatingCard: Row(
                       children: [
                         StatCard(icon: Icons.event_busy_outlined, etiqueta: 'Vencen este mes', valor: '$esteMes'),
                         const SizedBox(width: VenceSpace.s3),
@@ -57,15 +57,16 @@ class InicioTab extends StatelessWidget {
               );
             },
           ),
+          const SizedBox(height: CurvedHeader.floatingCardSpacing),
           Padding(
-            padding: const EdgeInsets.all(VenceSpace.s4),
+            padding: const EdgeInsets.fromLTRB(VenceSpace.s4, 0, VenceSpace.s4, VenceSpace.s4),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const _SeccionAsuntos(),
-                const SizedBox(height: VenceSpace.s6),
+                const SizedBox(height: VenceSpace.s8),
                 const _SeccionBandeja(),
-                const SizedBox(height: VenceSpace.s6),
+                const SizedBox(height: VenceSpace.s8),
                 const _SeccionVencimientos(),
               ],
             ),
@@ -86,12 +87,13 @@ class _SeccionTitulo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(titulo, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: context.colors.ink)),
-          if (accion != null) TextButton(onPressed: onAccion, child: Text(accion!)),
+          Text(titulo, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17, color: context.colors.ink)),
+          if (accion != null)
+            TextButton(onPressed: onAccion, child: Text(accion!, style: TextStyle(color: context.colors.brand, fontWeight: FontWeight.w600))),
         ],
       ),
     );

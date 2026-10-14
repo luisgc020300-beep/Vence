@@ -6,6 +6,12 @@
 // NO la usan -- se quedan con un AppBar plano, igual que la referencia
 // distingue "Summary" (cabecera azul) de "Add Subscription" (cabecera
 // blanca con flecha).
+//
+// [floatingCard] (p. ej. las tarjetas de resumen) NO va dentro del área
+// azul -- se pinta superpuesto al límite entre el azul y el fondo claro,
+// con sombra propia, igual que las tarjetas "Due this month"/"Monthly avg"
+// de la referencia, que flotan a caballo entre ambas superficies en vez de
+// quedar encajadas dentro de la cabecera.
 import 'package:flutter/material.dart';
 
 import '../theme/design_tokens.dart';
@@ -15,32 +21,46 @@ class CurvedHeader extends StatelessWidget {
     required this.titulo,
     this.leading,
     this.trailing,
-    this.child,
+    this.floatingCard,
     super.key,
   });
 
   final String titulo;
   final Widget? leading;
   final Widget? trailing;
+  final Widget? floatingCard;
 
-  /// Contenido extra debajo del título (p. ej. las tarjetas de resumen).
-  final Widget? child;
+  /// Cuánto sobresale [floatingCard] por debajo de la curva azul -- quien
+  /// use esta cabecera con una tarjeta flotante debe reservar este mismo
+  /// espacio justo debajo (ver `floatingCardSpacing`) para que el
+  /// contenido siguiente no quede tapado.
+  static const double overlap = 38;
+
+  /// Alto total a reservar debajo de la cabecera cuando se usa
+  /// [floatingCard]: el solape más un margen de aire hasta la siguiente
+  /// sección.
+  static const double floatingCardSpacing = overlap + VenceSpace.s4;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: context.colors.brand,
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(VenceSpace.s4, VenceSpace.s2, VenceSpace.s4, VenceSpace.s5),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: context.colors.brand,
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                VenceSpace.s4,
+                VenceSpace.s2,
+                VenceSpace.s4,
+                floatingCard != null ? overlap + VenceSpace.s6 : VenceSpace.s5,
+              ),
+              child: Row(
                 children: [
                   leading ?? const SizedBox(width: 36),
                   Expanded(
@@ -53,11 +73,17 @@ class CurvedHeader extends StatelessWidget {
                   trailing ?? const SizedBox(width: 36),
                 ],
               ),
-              if (child != null) ...[const SizedBox(height: VenceSpace.s4), child!],
-            ],
+            ),
           ),
         ),
-      ),
+        if (floatingCard != null)
+          Positioned(
+            left: VenceSpace.s4,
+            right: VenceSpace.s4,
+            bottom: -overlap,
+            child: floatingCard!,
+          ),
+      ],
     );
   }
 }

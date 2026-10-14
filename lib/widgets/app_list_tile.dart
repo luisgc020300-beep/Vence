@@ -32,14 +32,20 @@ class AppListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: context.colors.surface,
-      borderRadius: BorderRadius.circular(VenceRadius.md),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(VenceRadius.md),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
+    return Container(
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.circular(VenceRadius.lg),
+        boxShadow: [BoxShadow(color: context.colors.ink.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4))],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(VenceRadius.lg),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(VenceRadius.lg),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(13),
           child: Row(
             children: [
               Container(
@@ -68,7 +74,8 @@ class AppListTile extends StatelessWidget {
                       Text(valorAbajo!, style: TextStyle(fontSize: 11, color: valorAbajoColor ?? context.colors.inkMuted)),
                   ],
                 ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
