@@ -1,6 +1,6 @@
 // lib/screens/inicio_tab.dart
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../models/asunto.dart';
 import '../models/documento.dart';
@@ -8,8 +8,12 @@ import '../models/evento.dart';
 import '../services/asunto_service.dart';
 import '../services/documento_service.dart';
 import '../services/evento_service.dart';
+import '../theme/categoria_estilos.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/app_list_tile.dart';
+import '../widgets/curved_header.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/stat_card.dart';
 import 'asuntos_tab.dart';
 import 'asunto_detail_screen.dart';
 import 'documento_detail_screen.dart';
@@ -19,28 +23,71 @@ class InicioTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final email = FirebaseAuth.instance.currentUser?.email ?? '';
-    final nombre = email.contains('@') ? email.split('@').first : email;
-
     return Scaffold(
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('VENCE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: context.colors.inkMuted)),
-            Text(nombre.isEmpty ? 'Hola' : 'Hola, $nombre', style: Theme.of(context).textTheme.displaySmall),
-          ],
-        ),
-      ),
       body: ListView(
-        padding: const EdgeInsets.all(VenceSpace.s4),
+        padding: EdgeInsets.zero,
         children: [
-          _SeccionAsuntos(),
-          const SizedBox(height: VenceSpace.s6),
-          _SeccionBandeja(),
-          const SizedBox(height: VenceSpace.s6),
-          _SeccionVencimientos(),
+          StreamBuilder<List<Evento>>(
+            stream: EventoService.streamEventos(estado: EstadoEvento.pendiente),
+            builder: (context, eventosSnap) {
+              return StreamBuilder<List<Asunto>>(
+                stream: AsuntoService.streamAsuntos(soloAbiertos: true),
+                builder: (context, asuntosSnap) {
+                  final hoy = DateTime.now();
+                  final esteMes = (eventosSnap.data ?? []).where((e) => e.fecha.year == hoy.year && e.fecha.month == hoy.month).length;
+                  final abiertos = asuntosSnap.data?.length ?? 0;
+
+                  return CurvedHeader(
+                    titulo: 'Vence',
+                    leading: const HeaderAvatar(),
+                    trailing: HeaderIconButton(icon: Icons.notifications_outlined, onTap: () {}),
+                    child: Row(
+                      children: [
+                        StatCard(icon: Icons.event_busy_outlined, etiqueta: 'Vencen este mes', valor: '$esteMes'),
+                        const SizedBox(width: VenceSpace.s3),
+                        StatCard(icon: Icons.work_outline, etiqueta: 'Asuntos abiertos', valor: '$abiertos'),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+          Padding(
+            padding: const EdgeInsets.all(VenceSpace.s4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _SeccionAsuntos(),
+                const SizedBox(height: VenceSpace.s6),
+                const _SeccionBandeja(),
+                const SizedBox(height: VenceSpace.s6),
+                const _SeccionVencimientos(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _SeccionTitulo extends StatelessWidget {
+  const _SeccionTitulo({required this.titulo, this.accion, this.onAccion});
+  final String titulo;
+  final String? accion;
+  final VoidCallback? onAccion;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(titulo, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: context.colors.ink)),
+          if (accion != null) TextButton(onPressed: onAccion, child: Text(accion!)),
         ],
       ),
     );
@@ -48,103 +95,34 @@ class InicioTab extends StatelessWidget {
 }
 
 class _SeccionAsuntos extends StatelessWidget {
+  const _SeccionAsuntos();
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(children: [Icon(Icons.work_outline, size: 16, color: context.colors.brand), const SizedBox(width: 6), const Text('Asuntos abiertos', style: TextStyle(fontWeight: FontWeight.w600))]),
-            TextButton(
-              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AsuntosTab())),
-              child: const Text('Ver todos'),
-            ),
-          ],
-        ),
+        _SeccionTitulo(titulo: 'Asuntos abiertos', accion: 'Ver todos', onAccion: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AsuntosTab()))),
         StreamBuilder<List<Asunto>>(
           stream: AsuntoService.streamAsuntos(soloAbiertos: true),
           builder: (context, snapshot) {
-            final asuntos = (snapshot.data ?? []).take(5).toList();
+            final asuntos = (snapshot.data ?? []).take(4).toList();
             if (asuntos.isEmpty) {
               return const EmptyState(icon: Icons.work_outline, title: 'No tienes asuntos abiertos', description: 'Un asunto agrupa documentos, tareas y evidencias de una gestión real.');
             }
             return Column(
-              children: asuntos
-                  .map((a) => Card(
-                        child: ListTile(
-                          title: Text(a.titulo, maxLines: 1, overflow: TextOverflow.ellipsis),
-                          subtitle: Text(a.tipo.etiqueta),
-                          trailing: _Badge(texto: a.estado.etiqueta, tono: a.estado == EstadoAsunto.bloqueado ? context.colors.error : context.colors.brand),
-                          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AsuntoDetailScreen(asuntoId: a.id))),
-                        ),
-                      ))
-                  .toList(),
-            );
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _SeccionBandeja extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(children: [Icon(Icons.inbox_outlined, size: 16, color: context.colors.brand), const SizedBox(width: 6), const Text('Bandeja de entrada', style: TextStyle(fontWeight: FontWeight.w600))]),
-        StreamBuilder<List<Documento>>(
-          stream: DocumentoService.streamDocumentos(estado: EstadoDocumento.enRevision),
-          builder: (context, snapshot) {
-            final docs = snapshot.data ?? [];
-            if (docs.isEmpty) {
-              return const EmptyState(icon: Icons.inbox_outlined, title: 'Nada pendiente de revisar', description: 'Cuando añadas un documento, aparecerá aquí para confirmar los datos detectados.');
-            }
-            return Column(
-              children: docs
-                  .map((d) => Card(
-                        child: ListTile(
-                          title: Text(d.nombreOriginal, maxLines: 1, overflow: TextOverflow.ellipsis),
-                          subtitle: Text(d.resumen ?? 'Sin resumen', maxLines: 1, overflow: TextOverflow.ellipsis),
-                          trailing: _Badge(texto: d.categoria.etiqueta, tono: context.colors.warning),
-                          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DocumentoDetailScreen(documentoId: d.id))),
-                        ),
-                      ))
-                  .toList(),
-            );
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _SeccionVencimientos extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(children: [Icon(Icons.event_outlined, size: 16, color: context.colors.brand), const SizedBox(width: 6), const Text('Próximos vencimientos', style: TextStyle(fontWeight: FontWeight.w600))]),
-        StreamBuilder<List<Evento>>(
-          stream: EventoService.streamEventos(estado: EstadoEvento.pendiente),
-          builder: (context, snapshot) {
-            final eventos = (snapshot.data ?? []).take(6).toList();
-            if (eventos.isEmpty) {
-              return const EmptyState(icon: Icons.event_outlined, title: 'Sin vencimientos próximos', description: 'Los que detectemos en tus documentos, o que crees a mano, aparecerán aquí.');
-            }
-            return Column(
-              children: eventos.map((e) {
-                final dias = e.diasRestantes;
-                final tono = dias < 0 ? context.colors.error : (dias <= 7 ? context.colors.warning : context.colors.inkMuted);
-                return Card(
-                  child: ListTile(
-                    title: Text(e.titulo, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text(e.tipoEvento.etiqueta),
-                    trailing: _Badge(texto: dias < 0 ? 'Atrasado' : (dias == 0 ? 'Hoy' : '$dias días'), tono: tono),
+              children: asuntos.map((a) {
+                final (icon, color) = estiloAsunto(context, a.tipo);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: AppListTile(
+                    icon: icon,
+                    iconColor: a.estado == EstadoAsunto.bloqueado ? context.colors.error : color,
+                    titulo: a.titulo,
+                    subtitulo: a.tipo.etiqueta,
+                    valorAbajo: a.estado.etiqueta,
+                    valorAbajoColor: a.estado == EstadoAsunto.bloqueado ? context.colors.errorText : null,
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AsuntoDetailScreen(asuntoId: a.id))),
                   ),
                 );
               }).toList(),
@@ -156,17 +134,81 @@ class _SeccionVencimientos extends StatelessWidget {
   }
 }
 
-class _Badge extends StatelessWidget {
-  const _Badge({required this.texto, required this.tono});
-  final String texto;
-  final Color tono;
+class _SeccionBandeja extends StatelessWidget {
+  const _SeccionBandeja();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: tono.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(VenceRadius.pill)),
-      child: Text(texto, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: tono)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SeccionTitulo(titulo: 'Bandeja de entrada'),
+        StreamBuilder<List<Documento>>(
+          stream: DocumentoService.streamDocumentos(estado: EstadoDocumento.enRevision),
+          builder: (context, snapshot) {
+            final docs = snapshot.data ?? [];
+            if (docs.isEmpty) {
+              return const EmptyState(icon: Icons.inbox_outlined, title: 'Nada pendiente de revisar', description: 'Cuando añadas un documento, aparecerá aquí.');
+            }
+            return Column(
+              children: docs.map((d) {
+                final (icon, color) = estiloCategoria(context, d.categoria);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: AppListTile(
+                    icon: icon,
+                    iconColor: color,
+                    titulo: d.nombreOriginal,
+                    subtitulo: d.resumen ?? 'Sin resumen',
+                    valorArriba: d.categoria.etiqueta,
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => DocumentoDetailScreen(documentoId: d.id))),
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _SeccionVencimientos extends StatelessWidget {
+  const _SeccionVencimientos();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SeccionTitulo(titulo: 'Próximos vencimientos'),
+        StreamBuilder<List<Evento>>(
+          stream: EventoService.streamEventos(estado: EstadoEvento.pendiente),
+          builder: (context, snapshot) {
+            final eventos = (snapshot.data ?? []).take(5).toList();
+            if (eventos.isEmpty) {
+              return const EmptyState(icon: Icons.event_outlined, title: 'Sin vencimientos próximos', description: 'Los que detectemos en tus documentos, o que crees a mano, aparecerán aquí.');
+            }
+            return Column(
+              children: eventos.map((e) {
+                final dias = e.diasRestantes;
+                final (icon, color) = estiloEvento(context, e.tipoEvento);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: AppListTile(
+                    icon: icon,
+                    iconColor: color,
+                    titulo: e.titulo,
+                    subtitulo: DateFormat('d MMM yyyy', 'es_ES').format(e.fecha),
+                    valorArriba: dias < 0 ? 'Atrasado' : (dias == 0 ? 'Hoy' : '$dias días'),
+                    valorAbajoColor: dias < 0 ? context.colors.errorText : null,
+                  ),
+                );
+              }).toList(),
+            );
+          },
+        ),
+      ],
     );
   }
 }

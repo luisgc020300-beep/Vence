@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart' show Share;
 
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
+import '../widgets/curved_header.dart';
 import '../widgets/ios_list.dart';
 
 class PerfilTab extends StatefulWidget {
@@ -88,33 +89,40 @@ class _PerfilTabState extends State<PerfilTab> {
   Widget build(BuildContext context) {
     final email = FirebaseAuth.instance.currentUser?.email ?? '';
     return Scaffold(
-      appBar: AppBar(title: const Text('Perfil')),
       body: ListView(
-        padding: const EdgeInsets.all(VenceSpace.s4),
+        padding: EdgeInsets.zero,
         children: [
-          IosSection(
-            header: 'Cuenta',
-            rows: [IosRow(icon: Icons.mail_outline, iconColor: context.colors.brand, title: email, subtitle: 'Correo de acceso', showChevron: false)],
-          ),
-          IosSection(
-            header: 'Privacidad y datos',
-            rows: [
-              IosRow(
-                icon: Icons.download_outlined,
-                iconColor: context.colors.success,
-                title: _exportando ? 'Exportando...' : 'Exportar todos mis datos',
-                onTap: _exportando ? null : _exportarDatos,
-              ),
-              IosRow(icon: Icons.logout, iconColor: context.colors.inkMuted, title: 'Cerrar sesión', onTap: _cerrarSesion, showChevron: false),
-              IosRow(
-                icon: Icons.delete_outline,
-                iconColor: context.colors.error,
-                titleColor: context.colors.errorText,
-                title: _eliminando ? 'Eliminando...' : 'Eliminar cuenta',
-                onTap: _eliminando ? null : _eliminarCuenta,
-                showChevron: false,
-              ),
-            ],
+          const CurvedHeader(titulo: 'Perfil', leading: HeaderAvatar()),
+          Padding(
+            padding: const EdgeInsets.all(VenceSpace.s4),
+            child: Column(
+              children: [
+                IosSection(
+                  header: 'Cuenta',
+                  rows: [IosRow(icon: Icons.mail_outline, iconColor: context.colors.brand, title: email, subtitle: 'Correo de acceso', showChevron: false)],
+                ),
+                IosSection(
+                  header: 'Privacidad y datos',
+                  rows: [
+                    IosRow(
+                      icon: Icons.download_outlined,
+                      iconColor: context.colors.success,
+                      title: _exportando ? 'Exportando...' : 'Exportar todos mis datos',
+                      onTap: _exportando ? null : _exportarDatos,
+                    ),
+                    IosRow(icon: Icons.logout, iconColor: context.colors.inkMuted, title: 'Cerrar sesión', onTap: _cerrarSesion, showChevron: false),
+                    IosRow(
+                      icon: Icons.delete_outline,
+                      iconColor: context.colors.error,
+                      titleColor: context.colors.errorText,
+                      title: _eliminando ? 'Eliminando...' : 'Eliminar cuenta',
+                      onTap: _eliminando ? null : _eliminarCuenta,
+                      showChevron: false,
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
       ),

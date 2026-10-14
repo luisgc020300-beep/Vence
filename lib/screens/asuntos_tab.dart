@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 
 import '../models/asunto.dart';
 import '../services/asunto_service.dart';
+import '../theme/categoria_estilos.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/app_list_tile.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/nuevo_asunto_dialog.dart';
 import 'asunto_detail_screen.dart';
@@ -45,11 +47,12 @@ class AsuntosTab extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.all(VenceSpace.s4),
             children: [
-              for (final a in abiertos) _AsuntoTile(asunto: a),
+              for (final a in abiertos) Padding(padding: const EdgeInsets.only(bottom: 8), child: _AsuntoTile(asunto: a)),
               if (cerrados.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Text('Cerrados', style: TextStyle(color: context.colors.inkMuted, fontWeight: FontWeight.w600)),
-                for (final a in cerrados) Opacity(opacity: 0.7, child: _AsuntoTile(asunto: a)),
+                const SizedBox(height: 8),
+                for (final a in cerrados) Padding(padding: const EdgeInsets.only(bottom: 8), child: Opacity(opacity: 0.7, child: _AsuntoTile(asunto: a))),
               ],
             ],
           );
@@ -65,16 +68,15 @@ class _AsuntoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        title: Text(asunto.titulo, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text(asunto.tipo.etiqueta),
-        trailing: Chip(
-          label: Text(asunto.estado.etiqueta, style: const TextStyle(fontSize: 11)),
-          backgroundColor: asunto.estado == EstadoAsunto.bloqueado ? context.colors.error.withValues(alpha: 0.15) : null,
-        ),
-        onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AsuntoDetailScreen(asuntoId: asunto.id))),
-      ),
+    final (icon, color) = estiloAsunto(context, asunto.tipo);
+    return AppListTile(
+      icon: icon,
+      iconColor: asunto.estado == EstadoAsunto.bloqueado ? context.colors.error : color,
+      titulo: asunto.titulo,
+      subtitulo: asunto.tipo.etiqueta,
+      valorAbajo: asunto.estado.etiqueta,
+      valorAbajoColor: asunto.estado == EstadoAsunto.bloqueado ? context.colors.errorText : null,
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AsuntoDetailScreen(asuntoId: asunto.id))),
     );
   }
 }

@@ -5,6 +5,7 @@ import '../models/mensaje.dart';
 import '../services/asistente_service.dart';
 import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
+import '../widgets/curved_header.dart';
 import 'documento_detail_screen.dart';
 
 class AsistenteTab extends StatefulWidget {
@@ -55,9 +56,9 @@ class _AsistenteTabState extends State<AsistenteTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Asistente')),
       body: Column(
         children: [
+          const CurvedHeader(titulo: 'Asistente'),
           Expanded(
             child: _conversacionId == null
                 ? _estadoInicial(context)

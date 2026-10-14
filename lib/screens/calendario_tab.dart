@@ -4,85 +4,171 @@ import 'package:intl/intl.dart';
 
 import '../models/evento.dart';
 import '../services/evento_service.dart';
+import '../theme/categoria_estilos.dart';
 import '../theme/design_tokens.dart';
+import '../widgets/app_list_tile.dart';
+import '../widgets/curved_header.dart';
 import '../widgets/empty_state.dart';
+import '../widgets/stat_card.dart';
 
-class CalendarioTab extends StatelessWidget {
+class CalendarioTab extends StatefulWidget {
   const CalendarioTab({super.key});
+
+  @override
+  State<CalendarioTab> createState() => _CalendarioTabState();
+}
+
+class _CalendarioTabState extends State<CalendarioTab> {
+  DateTime _mesVisible = DateTime(DateTime.now().year, DateTime.now().month);
+
+  void _cambiarMes(int delta) {
+    setState(() => _mesVisible = DateTime(_mesVisible.year, _mesVisible.month + delta));
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Calendario'),
-        actions: [IconButton(icon: const Icon(Icons.add), onPressed: () => _mostrarNuevaTarea(context))],
-      ),
       body: StreamBuilder<List<Evento>>(
         stream: EventoService.streamEventos(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          final eventos = snapshot.data!;
+          final eventos = snapshot.data ?? [];
           final pendientes = eventos.where((e) => e.estado == EstadoEvento.pendiente).toList();
-          final resueltos = eventos.where((e) => e.estado != EstadoEvento.pendiente).take(10).toList();
-
-          if (pendientes.isEmpty && resueltos.isEmpty) {
-            return const EmptyState(icon: Icons.calendar_month_outlined, title: 'No tienes vencimientos pendientes', description: 'Los que detectemos en tus documentos, o que crees a mano, aparecerán aquí.');
-          }
-
-          final grupos = <String, List<Evento>>{};
-          for (final e in pendientes) {
-            final clave = DateFormat('MMMM yyyy', 'es_ES').format(e.fecha);
-            grupos.putIfAbsent(clave, () => []).add(e);
-          }
+          final delMes = pendientes.where((e) => e.fecha.year == _mesVisible.year && e.fecha.month == _mesVisible.month).toList();
+          final atrasados = pendientes.where((e) => e.diasRestantes < 0).length;
 
           return ListView(
-            padding: const EdgeInsets.all(VenceSpace.s4),
+            padding: EdgeInsets.zero,
             children: [
-              for (final entry in grupos.entries) ...[
-                Text(entry.key, style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 6),
-                for (final e in entry.value) _EventoTile(evento: e),
-                const SizedBox(height: 16),
-              ],
-              if (resueltos.isNotEmpty) ...[
-                Text('Resueltas recientemente', style: TextStyle(color: context.colors.inkMuted, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 6),
-                for (final e in resueltos) _EventoTile(evento: e),
-              ],
+              CurvedHeader(
+                titulo: 'Calendario',
+                trailing: HeaderIconButton(icon: Icons.add, onTap: () => showDialog(context: context, builder: (_) => const _NuevaTareaDialog())),
+                child: Row(
+                  children: [
+                    StatCard(icon: Icons.event_outlined, etiqueta: 'Este mes', valor: '${delMes.length}'),
+                    const SizedBox(width: VenceSpace.s3),
+                    StatCard(icon: Icons.warning_amber_outlined, etiqueta: 'Atrasados', valor: '$atrasados', color: atrasados > 0 ? context.colors.error : null),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(VenceSpace.s4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _SelectorMes(mes: _mesVisible, onPrev: () => _cambiarMes(-1), onNext: () => _cambiarMes(1)),
+                    const SizedBox(height: 12),
+                    _GridMes(mes: _mesVisible, eventos: delMes),
+                    const SizedBox(height: VenceSpace.s5),
+                    Text('Pendientes', style: TextStyle(fontWeight: FontWeight.w700, color: context.colors.ink)),
+                    const SizedBox(height: 8),
+                    if (pendientes.isEmpty)
+                      const EmptyState(icon: Icons.calendar_month_outlined, title: 'No tienes vencimientos pendientes', description: 'Los que detectemos en tus documentos, o que crees a mano, aparecerán aquí.')
+                    else
+                      ...pendientes.map((e) {
+                        final dias = e.diasRestantes;
+                        final (icon, color) = estiloEvento(context, e.tipoEvento);
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Dismissible(
+                            key: ValueKey(e.id),
+                            background: Container(color: context.colors.success, alignment: Alignment.centerLeft, padding: const EdgeInsets.only(left: 16), child: const Icon(Icons.check, color: Colors.white)),
+                            secondaryBackground: Container(color: context.colors.error, alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 16), child: const Icon(Icons.close, color: Colors.white)),
+                            onDismissed: (dir) => EventoService.actualizarEstado(e.id, dir == DismissDirection.startToEnd ? EstadoEvento.completada : EstadoEvento.cancelada),
+                            child: AppListTile(
+                              icon: icon,
+                              iconColor: color,
+                              titulo: e.titulo,
+                              subtitulo: DateFormat('d MMM yyyy', 'es_ES').format(e.fecha),
+                              valorArriba: dias < 0 ? 'Atrasado' : (dias == 0 ? 'Hoy' : '$dias días'),
+                              valorAbajoColor: dias < 0 ? context.colors.errorText : null,
+                            ),
+                          ),
+                        );
+                      }),
+                  ],
+                ),
+              ),
             ],
           );
         },
       ),
     );
   }
-
-  void _mostrarNuevaTarea(BuildContext context) {
-    showDialog(context: context, builder: (_) => const _NuevaTareaDialog());
-  }
 }
 
-class _EventoTile extends StatelessWidget {
-  const _EventoTile({required this.evento});
-  final Evento evento;
+class _SelectorMes extends StatelessWidget {
+  const _SelectorMes({required this.mes, required this.onPrev, required this.onNext});
+  final DateTime mes;
+  final VoidCallback onPrev;
+  final VoidCallback onNext;
 
   @override
   Widget build(BuildContext context) {
-    final dias = evento.diasRestantes;
-    final esPendiente = evento.estado == EstadoEvento.pendiente;
-    return Opacity(
-      opacity: esPendiente ? 1 : 0.6,
-      child: Card(
-        child: ListTile(
-          title: Text(evento.titulo),
-          subtitle: Text('${evento.tipoEvento.etiqueta} · ${DateFormat('d MMM yyyy', 'es_ES').format(evento.fecha)}${esPendiente ? (dias < 0 ? ' · Atrasado' : dias == 0 ? ' · Hoy' : ' · en $dias días') : ''}'),
-          trailing: esPendiente
-              ? Row(mainAxisSize: MainAxisSize.min, children: [
-                  IconButton(icon: Icon(Icons.check, color: context.colors.success), onPressed: () => EventoService.actualizarEstado(evento.id, EstadoEvento.completada)),
-                  IconButton(icon: Icon(Icons.schedule, color: context.colors.warningText), onPressed: () => EventoService.posponerUnaSemana(evento)),
-                  IconButton(icon: Icon(Icons.close, color: context.colors.errorText), onPressed: () => EventoService.actualizarEstado(evento.id, EstadoEvento.cancelada)),
-                ])
-              : null,
-        ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        IconButton(icon: const Icon(Icons.chevron_left), onPressed: onPrev),
+        Text(DateFormat('MMMM yyyy', 'es_ES').format(mes), style: TextStyle(fontWeight: FontWeight.w700, color: context.colors.ink)),
+        IconButton(icon: const Icon(Icons.chevron_right), onPressed: onNext),
+      ],
+    );
+  }
+}
+
+class _GridMes extends StatelessWidget {
+  const _GridMes({required this.mes, required this.eventos});
+  final DateTime mes;
+  final List<Evento> eventos;
+
+  @override
+  Widget build(BuildContext context) {
+    final primerDia = DateTime(mes.year, mes.month, 1);
+    final diasEnMes = DateTime(mes.year, mes.month + 1, 0).day;
+    final offset = (primerDia.weekday - 1) % 7; // lunes = 0
+    final hoy = DateTime.now();
+    final diasConEvento = eventos.map((e) => e.fecha.day).toSet();
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(VenceRadius.md)),
+      child: Column(
+        children: [
+          Row(
+            children: ['L', 'M', 'X', 'J', 'V', 'S', 'D']
+                .map((d) => Expanded(child: Center(child: Text(d, style: TextStyle(fontSize: 11, color: context.colors.inkMuted)))))
+                .toList(),
+          ),
+          const SizedBox(height: 6),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7),
+            itemCount: offset + diasEnMes,
+            itemBuilder: (context, i) {
+              if (i < offset) return const SizedBox.shrink();
+              final dia = i - offset + 1;
+              final esHoy = hoy.year == mes.year && hoy.month == mes.month && hoy.day == dia;
+              return Container(
+                margin: const EdgeInsets.all(2),
+                decoration: esHoy ? BoxDecoration(color: context.colors.brand, shape: BoxShape.circle) : null,
+                alignment: Alignment.center,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('$dia', style: TextStyle(fontSize: 12, color: esHoy ? Colors.white : context.colors.ink)),
+                    if (diasConEvento.contains(dia))
+                      Container(
+                        margin: const EdgeInsets.only(top: 2),
+                        width: 4,
+                        height: 4,
+                        decoration: BoxDecoration(color: esHoy ? Colors.white : context.colors.brand, shape: BoxShape.circle),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
