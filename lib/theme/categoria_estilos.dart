@@ -8,6 +8,15 @@ import '../models/asunto.dart';
 import '../models/documento.dart';
 import '../models/evento.dart';
 import 'design_tokens.dart';
+import 'marca_estilos.dart';
+
+/// Icono + color para una fila de documento: logo real si el
+/// nombre/resumen menciona una marca reconocida (Netflix, Spotify...),
+/// icono genérico de categoría en cualquier otro caso.
+(IconData, Color) estiloDocumento(BuildContext context, Documento d) {
+  final marca = estiloMarca('${d.nombreOriginal} ${d.resumen ?? ''}');
+  return marca ?? estiloCategoria(context, d.categoria);
+}
 
 (IconData, Color) estiloCategoria(BuildContext context, CategoriaDocumento c) {
   final colors = context.colors;

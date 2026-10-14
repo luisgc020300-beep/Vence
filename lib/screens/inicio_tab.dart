@@ -158,7 +158,7 @@ class _SeccionBandeja extends StatelessWidget {
             }
             return Column(
               children: docs.map((d) {
-                final (icon, color) = estiloCategoria(context, d.categoria);
+                final (icon, color) = estiloDocumento(context, d);
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: AppListTile(
