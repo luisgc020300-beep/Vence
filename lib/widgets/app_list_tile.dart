@@ -33,7 +33,7 @@ class AppListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: context.colors.surface,
       borderRadius: BorderRadius.circular(VenceRadius.md),
       child: InkWell(
         borderRadius: BorderRadius.circular(VenceRadius.md),

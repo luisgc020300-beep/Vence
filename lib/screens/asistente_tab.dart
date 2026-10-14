@@ -148,7 +148,7 @@ class _BurbujaMensaje extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(mensaje.contenido, style: TextStyle(color: esUsuario ? Colors.white : context.colors.ink)),
+            Text(mensaje.contenido, style: TextStyle(color: esUsuario ? context.colors.brandOn : context.colors.ink)),
             if (!esUsuario && mensaje.confiado == false)
               Padding(
                 padding: const EdgeInsets.only(top: 6),

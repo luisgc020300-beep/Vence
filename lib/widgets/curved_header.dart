@@ -47,7 +47,7 @@ class CurvedHeader extends StatelessWidget {
                     child: Text(
                       titulo,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                      style: TextStyle(color: context.colors.brandOn, fontSize: 18, fontWeight: FontWeight.w700),
                     ),
                   ),
                   trailing ?? const SizedBox(width: 36),
@@ -69,7 +69,7 @@ class HeaderAvatar extends StatelessWidget {
     return Container(
       width: 36,
       height: 36,
-      decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+      decoration: BoxDecoration(color: context.colors.brandOn, shape: BoxShape.circle),
       child: Icon(Icons.person_outline, size: 18, color: context.colors.brand),
     );
   }
@@ -86,9 +86,9 @@ class HeaderIconButton extends StatelessWidget {
       width: 36,
       height: 36,
       child: Material(
-        color: Colors.white.withValues(alpha: 0.18),
+        color: context.colors.brandOn.withValues(alpha: 0.18),
         shape: const CircleBorder(),
-        child: InkWell(customBorder: const CircleBorder(), onTap: onTap, child: Icon(icon, color: Colors.white, size: 18)),
+        child: InkWell(customBorder: const CircleBorder(), onTap: onTap, child: Icon(icon, color: context.colors.brandOn, size: 18)),
       ),
     );
   }

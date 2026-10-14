@@ -17,6 +17,7 @@ import '../widgets/stat_card.dart';
 import 'asuntos_tab.dart';
 import 'asunto_detail_screen.dart';
 import 'documento_detail_screen.dart';
+import 'settings_screen.dart';
 
 class InicioTab extends StatelessWidget {
   const InicioTab({super.key});
@@ -40,7 +41,10 @@ class InicioTab extends StatelessWidget {
                   return CurvedHeader(
                     titulo: 'Vence',
                     leading: const HeaderAvatar(),
-                    trailing: HeaderIconButton(icon: Icons.notifications_outlined, onTap: () {}),
+                    trailing: HeaderIconButton(
+                      icon: Icons.settings_outlined,
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
+                    ),
                     child: Row(
                       children: [
                         StatCard(icon: Icons.event_busy_outlined, etiqueta: 'Vencen este mes', valor: '$esteMes'),

@@ -68,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       height: 72,
                       decoration: BoxDecoration(color: context.colors.brand, borderRadius: BorderRadius.circular(VenceRadius.md)),
                       alignment: Alignment.center,
-                      child: const Text('V', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700)),
+                      child: Text('V', style: TextStyle(color: context.colors.brandOn, fontSize: 32, fontWeight: FontWeight.w700)),
                     ),
                   ),
                   const SizedBox(height: VenceSpace.s5),
@@ -115,7 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   FilledButton(
                     onPressed: _cargando ? null : _enviar,
                     child: _cargando
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: context.colors.brandOn))
                         : Text(_esRegistro ? 'Crear cuenta' : 'Entrar'),
                   ),
                   const SizedBox(height: VenceSpace.s2),

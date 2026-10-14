@@ -130,7 +130,7 @@ class _GridMes extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(VenceRadius.md)),
+      decoration: BoxDecoration(color: context.colors.surface, borderRadius: BorderRadius.circular(VenceRadius.md)),
       child: Column(
         children: [
           Row(
@@ -155,13 +155,13 @@ class _GridMes extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('$dia', style: TextStyle(fontSize: 12, color: esHoy ? Colors.white : context.colors.ink)),
+                    Text('$dia', style: TextStyle(fontSize: 12, color: esHoy ? context.colors.brandOn : context.colors.ink)),
                     if (diasConEvento.contains(dia))
                       Container(
                         margin: const EdgeInsets.only(top: 2),
                         width: 4,
                         height: 4,
-                        decoration: BoxDecoration(color: esHoy ? Colors.white : context.colors.brand, shape: BoxShape.circle),
+                        decoration: BoxDecoration(color: esHoy ? context.colors.brandOn : context.colors.brand, shape: BoxShape.circle),
                       ),
                   ],
                 ),

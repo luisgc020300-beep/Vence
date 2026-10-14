@@ -10,6 +10,7 @@ import '../theme/design_tokens.dart';
 import '../widgets/app_error.dart';
 import '../widgets/curved_header.dart';
 import '../widgets/ios_list.dart';
+import 'settings_screen.dart';
 
 class PerfilTab extends StatefulWidget {
   const PerfilTab({super.key});
@@ -92,7 +93,11 @@ class _PerfilTabState extends State<PerfilTab> {
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
-          const CurvedHeader(titulo: 'Perfil', leading: HeaderAvatar()),
+          CurvedHeader(
+            titulo: 'Perfil',
+            leading: const HeaderAvatar(),
+            trailing: HeaderIconButton(icon: Icons.settings_outlined, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen()))),
+          ),
           Padding(
             padding: const EdgeInsets.all(VenceSpace.s4),
             child: Column(

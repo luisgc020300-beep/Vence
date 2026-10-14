@@ -52,12 +52,13 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
           : FloatingActionButton(
               onPressed: () => mostrarHojaSubirDocumento(context),
               tooltip: 'Añadir documento',
-              backgroundColor: Theme.of(context).extension<VenceColors>()!.ink,
+              backgroundColor: context.colors.ink,
+              foregroundColor: context.colors.background,
               child: const Icon(Icons.add),
             ),
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.colors.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, -2))],
         ),
@@ -67,7 +68,7 @@ class _HomeShellScreenState extends State<HomeShellScreen> {
             currentIndex: _index,
             onTap: _cambiarPestana,
             type: BottomNavigationBarType.fixed,
-            backgroundColor: Colors.white,
+            backgroundColor: context.colors.surface,
             elevation: 0,
             items: const [
               BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), activeIcon: Icon(Icons.dashboard), label: 'Inicio'),

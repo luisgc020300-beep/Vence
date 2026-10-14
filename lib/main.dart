@@ -15,6 +15,7 @@ import 'firebase_options.dart';
 import 'screens/home_shell_screen.dart';
 import 'screens/login_screen.dart';
 import 'theme/design_tokens.dart';
+import 'theme/theme_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,29 +47,35 @@ void main() async {
     await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(!kDebugMode);
   }
 
-  runApp(const VenceApp());
+  final themeController = await ThemeController.load();
+  runApp(VenceApp(themeController: themeController));
 }
 
 class VenceApp extends StatelessWidget {
-  const VenceApp({super.key});
+  const VenceApp({required this.themeController, super.key});
+
+  final ThemeController themeController;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Vence',
-      themeMode: ThemeMode.system,
-      theme: buildVenceLightTheme(),
-      darkTheme: buildVenceDarkTheme(),
-      home: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(body: Center(child: CircularProgressIndicator()));
-          }
-          if (snapshot.hasData) return const HomeShellScreen();
-          return const LoginScreen();
-        },
+    return AnimatedBuilder(
+      animation: themeController,
+      builder: (context, _) => MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'Vence',
+        themeMode: themeController.mode,
+        theme: buildVenceLightTheme(),
+        darkTheme: buildVenceDarkTheme(),
+        home: StreamBuilder<User?>(
+          stream: FirebaseAuth.instance.authStateChanges(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(body: Center(child: CircularProgressIndicator()));
+            }
+            if (snapshot.hasData) return const HomeShellScreen();
+            return const LoginScreen();
+          },
+        ),
       ),
     );
   }

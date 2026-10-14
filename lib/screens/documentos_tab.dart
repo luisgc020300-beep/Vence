@@ -31,7 +31,7 @@ class _DocumentosTabState extends State<DocumentosTab> {
             titulo: 'Documentos',
             leading: const SizedBox(width: 36),
             trailing: PopupMenuButton<CategoriaDocumento?>(
-              icon: const Icon(Icons.filter_list, color: Colors.white),
+              icon: Icon(Icons.filter_list, color: context.colors.brandOn),
               onSelected: (v) => setState(() => _categoria = v),
               itemBuilder: (_) => [
                 const PopupMenuItem(value: null, child: Text('Todas las categorías')),
@@ -40,7 +40,7 @@ class _DocumentosTabState extends State<DocumentosTab> {
             ),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(VenceRadius.sm)),
+              decoration: BoxDecoration(color: context.colors.surface, borderRadius: BorderRadius.circular(VenceRadius.sm)),
               child: TextField(
                 decoration: const InputDecoration(hintText: 'Buscar...', prefixIcon: Icon(Icons.search), border: InputBorder.none),
                 onChanged: (v) => setState(() => _busqueda = v.toLowerCase()),
