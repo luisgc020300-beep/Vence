@@ -41,7 +41,7 @@ class _CalendarioTabState extends State<CalendarioTab> {
             children: [
               CurvedHeader(
                 titulo: 'Calendario',
-                trailing: HeaderIconButton(icon: Icons.add, onTap: () => showDialog(context: context, builder: (_) => const _NuevaTareaDialog())),
+                trailing: HeaderIconButton(icon: Icons.add_task_outlined, onTap: () => showDialog(context: context, builder: (_) => const _NuevaTareaDialog())),
                 floatingCard: Row(
                   children: [
                     StatCard(icon: Icons.event_outlined, etiqueta: 'Este mes', valor: '${delMes.length}'),

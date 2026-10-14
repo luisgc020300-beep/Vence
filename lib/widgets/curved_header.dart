@@ -34,7 +34,11 @@ class CurvedHeader extends StatelessWidget {
   /// use esta cabecera con una tarjeta flotante debe reservar este mismo
   /// espacio justo debajo (ver `floatingCardSpacing`) para que el
   /// contenido siguiente no quede tapado.
-  static const double overlap = 38;
+  static const double overlap = 40;
+
+  /// Aire de azul visible entre el título y el borde superior de la
+  /// tarjeta flotante -- sin esto, la tarjeta arranca pegada al título.
+  static const double _gapAntesDeTarjeta = 28;
 
   /// Alto total a reservar debajo de la cabecera cuando se usa
   /// [floatingCard]: el solape más un margen de aire hasta la siguiente
@@ -58,7 +62,7 @@ class CurvedHeader extends StatelessWidget {
                 VenceSpace.s4,
                 VenceSpace.s2,
                 VenceSpace.s4,
-                floatingCard != null ? overlap + VenceSpace.s6 : VenceSpace.s5,
+                floatingCard != null ? _gapAntesDeTarjeta + 64 : VenceSpace.s5,
               ),
               child: Row(
                 children: [
