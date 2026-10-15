@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/design_tokens.dart';
+import '../widgets/app_error.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -44,6 +45,26 @@ class _LoginScreenState extends State<LoginScreen> {
       TextInput.finishAutofillContext();
     } on FirebaseAuthException catch (e) {
       setState(() => _error = e.message ?? 'Error de autenticación');
+    } finally {
+      if (mounted) setState(() => _cargando = false);
+    }
+  }
+
+  Future<void> _recuperarContrasena() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() => _error = 'Escribe primero tu correo arriba para enviarte el enlace.');
+      return;
+    }
+    setState(() {
+      _cargando = true;
+      _error = null;
+    });
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (mounted) AppError.showSuccess(context, 'Te hemos enviado un correo para restablecer tu contraseña.');
+    } on FirebaseAuthException catch (e) {
+      if (mounted) setState(() => _error = e.message ?? 'No se ha podido enviar el correo.');
     } finally {
       if (mounted) setState(() => _cargando = false);
     }
@@ -123,6 +144,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: _cargando ? null : () => setState(() => _esRegistro = !_esRegistro),
                     child: Text(_esRegistro ? '¿Ya tienes cuenta? Entra' : '¿No tienes cuenta? Regístrate'),
                   ),
+                  if (!_esRegistro)
+                    TextButton(
+                      onPressed: _cargando ? null : _recuperarContrasena,
+                      child: Text('¿Olvidaste tu contraseña?', style: TextStyle(color: context.colors.inkMuted)),
+                    ),
                 ],
               ),
             ),

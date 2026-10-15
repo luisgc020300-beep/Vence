@@ -65,7 +65,7 @@ class _PerfilTabState extends State<PerfilTab> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('¿Eliminar cuenta?'),
-        content: const Text('Esto eliminará tu cuenta de acceso de forma permanente. Tus documentos quedan en el servidor hasta que un administrador los borre (ver limitaciones del proyecto).'),
+        content: const Text('Esto eliminará tu cuenta y todos tus documentos, eventos y asuntos de forma permanente.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar')),
           FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Eliminar')),

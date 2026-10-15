@@ -4,6 +4,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/asunto.dart';
+import 'analytics_service.dart';
 import 'stream_error_logging.dart';
 
 class AsuntoException implements Exception {
@@ -80,6 +81,7 @@ class AsuntoService {
     if (documentoId != null) {
       await vincularDocumento(ref.id, documentoId, 'documento', nombreArchivo: nombreArchivoDocumento);
     }
+    AnalyticsService.asuntoCreado(tipo: tipo.valor);
     return ref.id;
   }
 
@@ -111,6 +113,7 @@ class AsuntoService {
 
     await _col.doc(asuntoId).update(data);
     await _log(asuntoId, 'cambio_estado', 'Estado cambiado de "${actual.etiqueta}" a "${nuevo.etiqueta}"');
+    if (nuevo == EstadoAsunto.cerrado) AnalyticsService.asuntoCerrado();
   }
 
   static Future<void> actualizarObjetivo(String asuntoId, String objetivo) {
@@ -129,6 +132,7 @@ class AsuntoService {
     });
     final data = Map<String, dynamic>.from(result.data as Map);
     await _log(asunto.id, 'borrador_generado', 'Borrador preparado: "${data['subject']}"', {'subject': data['subject'], 'mode': data['mode']});
+    AnalyticsService.borradorGenerado();
     return BorradorComunicacion(modo: data['mode'] as String, asunto: data['subject'] as String, cuerpo: data['body'] as String);
   }
 }

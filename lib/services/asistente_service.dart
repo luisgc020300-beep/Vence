@@ -4,6 +4,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/mensaje.dart';
+import 'analytics_service.dart';
 import 'stream_error_logging.dart';
 
 class AsistenteService {
@@ -89,6 +90,7 @@ class AsistenteService {
     });
 
     await _conversaciones.doc(convId).update({'updatedAt': FieldValue.serverTimestamp()});
+    AnalyticsService.preguntaAsistente();
     return convId;
   }
 }

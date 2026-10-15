@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import '../models/documento.dart';
+import 'analytics_service.dart';
 import 'stream_error_logging.dart';
 
 class DocumentoUploadException implements Exception {
@@ -100,6 +101,7 @@ class DocumentoService {
             .toList(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
+      AnalyticsService.documentoSubido(categoria: data['category'] as String? ?? 'otro');
     } catch (e) {
       await docRef.update({
         'estado': EstadoDocumento.enRevision.valor,

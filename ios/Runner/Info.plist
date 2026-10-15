@@ -14,6 +14,10 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>vence</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Vence necesita la cámara para fotografiar tus documentos y analizarlos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Vence necesita acceso a tus fotos para que puedas elegir una imagen de un documento desde tu galería.</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
+const functionsV1 = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 
 admin.initializeApp();
@@ -24,6 +25,33 @@ function claveConfigurada(apiKey) {
 // =============================================================================
 
 const CATEGORIAS = ['factura', 'garantia', 'contrato', 'seguro', 'suscripcion', 'justificante', 'manual_producto', 'otro'];
+
+// =============================================================================
+// Cuota diaria por usuario -- sin esto, una clave real de Anthropic
+// configurada no tiene ningun freno de gasto. Solo se aplica cuando hay
+// clave real -- en modo demo no hay coste real que proteger.
+// =============================================================================
+
+const LIMITE_ANALISIS_DIARIO = 30;
+const LIMITE_PREGUNTAS_ASISTENTE_DIARIO = 60;
+const LIMITE_BORRADORES_DIARIO = 15;
+
+function fechaHoyUtc() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function comprobarYRegistrarUso(uid, campo, limite) {
+  const db = admin.firestore();
+  const ref = db.collection('users').doc(uid).collection('uso').doc(fechaHoyUtc());
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const actual = (snap.exists && snap.data()[campo]) || 0;
+    if (actual >= limite) {
+      throw new HttpsError('resource-exhausted', 'Has alcanzado el límite diario de uso de IA. Inténtalo de nuevo mañana.');
+    }
+    tx.set(ref, { [campo]: actual + 1 }, { merge: true });
+  });
+}
 
 const EXTRACT_TOOL = {
   name: 'extraer_documento',
@@ -141,6 +169,8 @@ exports.analizarDocumento = onCall({ region: REGION, secrets: [_anthropicKey] },
     return demoAnalysis(filename);
   }
 
+  await comprobarYRegistrarUso(request.auth.uid, 'analisis', LIMITE_ANALISIS_DIARIO);
+
   const isPdf = mimeType === 'application/pdf';
   const isImage = mimeType.startsWith('image/');
   if (!isPdf && !isImage) {
@@ -256,6 +286,8 @@ exports.pedirAsistente = onCall({ region: REGION, secrets: [_anthropicKey] }, as
   const apiKey = _anthropicKey.value();
   if (!claveConfigurada(apiKey)) return demoAssistantAnswer(question, documents, events);
 
+  await comprobarYRegistrarUso(request.auth.uid, 'preguntasAsistente', LIMITE_PREGUNTAS_ASISTENTE_DIARIO);
+
   let res;
   try {
     res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -332,6 +364,8 @@ exports.generarBorrador = onCall({ region: REGION, secrets: [_anthropicKey] }, a
     };
   }
 
+  await comprobarYRegistrarUso(request.auth.uid, 'borradores', LIMITE_BORRADORES_DIARIO);
+
   let res;
   try {
     res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -362,4 +396,45 @@ exports.generarBorrador = onCall({ region: REGION, secrets: [_anthropicKey] }, a
   if (!toolUse) return { mode: 'real', subject: asuntoTitulo, body: 'No se ha podido generar un borrador en este momento.' };
 
   return { mode: 'real', subject: toolUse.input.subject, body: toolUse.input.body };
+});
+
+// =============================================================================
+// Limpieza de datos al eliminar una cuenta -- se dispara DESPUES de que
+// Firebase Auth ya ha borrado al usuario de verdad, asi que puede usar
+// privilegios de administrador sin depender de que el cliente siga
+// autenticado. El cliente (perfil_tab.dart) solo borra la cuenta de Auth;
+// si borrara los datos primero y luego fallara el borrado de Auth (p. ej.
+// "requires-recent-login", muy comun en esta operacion), el usuario se
+// quedaria con la cuenta viva pero sin ningun dato.
+// =============================================================================
+
+exports.limpiarDatosUsuario = functionsV1.region(REGION).auth.user().onDelete(async (user) => {
+  const uid = user.uid;
+  const db = admin.firestore();
+  const userRef = db.collection('users').doc(uid);
+
+  const documentos = await userRef.collection('documentos').get();
+  for (const doc of documentos.docs) {
+    const storagePath = doc.data().storagePath;
+    if (storagePath) {
+      try {
+        await admin.storage().bucket().file(storagePath).delete();
+      } catch (e) {
+        console.error(`limpiarDatosUsuario: no se pudo borrar ${storagePath}:`, e);
+      }
+    }
+  }
+
+  // Por si quedo algun objeto en Storage no referenciado en ningun
+  // documento (p. ej. una subida que nunca se llego a guardar).
+  try {
+    await admin.storage().bucket().deleteFiles({ prefix: `users/${uid}/` });
+  } catch (e) {
+    console.error(`limpiarDatosUsuario: no se pudo limpiar el prefijo de Storage de ${uid}:`, e);
+  }
+
+  // recursiveDelete cubre de una vez documentos/campos, asuntos/documentos,
+  // asuntos/actividad, conversaciones/mensajes y eventos -- toda la
+  // estructura anidada bajo users/{uid}, sin tener que enumerarla a mano.
+  await db.recursiveDelete(userRef);
 });

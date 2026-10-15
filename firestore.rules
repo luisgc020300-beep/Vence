@@ -5,6 +5,16 @@ rules_version = '2';
 // escribe sus datos. La única regla con lógica propia es la de asuntos:
 // no se puede marcar como completado/cerrado sin un criterio de cierre
 // explícito (igual que el trigger de Postgres de la versión web).
+//
+// Validación de esquema: Vence tiene muchos más patrones de escritura
+// parcial que Lumio (documentos/asuntos se actualizan desde varios flujos
+// distintos: análisis, vinculación, cambio de estado...), y no hay una
+// suite de tests de emulador que confirme cada combinación exacta. Por
+// eso aquí se valida "claves permitidas + tipo correcto en lo que esté
+// presente" en vez de fijar el subconjunto exacto de campos de cada
+// operación como en Lumio -- más simple y robusto frente a cambios de
+// código, a cambio de ser algo menos estricto sobre qué cambia en cada
+// escritura concreta.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -18,39 +28,119 @@ service cloud.firestore {
       return !(estadoNuevo in ['completado', 'cerrado']) || criterio.size() > 0;
     }
 
+    function opcional(campo) {
+      return !(campo in request.resource.data) || request.resource.data[campo] == null;
+    }
+
+    function textoOpcional(campo, maxLen) {
+      return opcional(campo) || (request.resource.data[campo] is string && request.resource.data[campo].size() <= maxLen);
+    }
+
+    function numeroOpcional(campo) {
+      return opcional(campo) || request.resource.data[campo] is number;
+    }
+
+    function listaOpcional(campo) {
+      return opcional(campo) || request.resource.data[campo] is list;
+    }
+
+    function mapaOpcional(campo) {
+      return opcional(campo) || request.resource.data[campo] is map;
+    }
+
     match /users/{uid} {
-      allow read, write: if esPropietario(uid);
+      allow read: if esPropietario(uid);
 
       match /documentos/{docId} {
-        allow read, write: if esPropietario(uid);
+        allow read, delete: if esPropietario(uid);
+
+        allow write: if esPropietario(uid)
+          && request.resource.data.keys().hasOnly(['nombreOriginal', 'storagePath', 'mimeType', 'sizeBytes', 'categoria', 'estado', 'modoAnalisis', 'resumen', 'duplicadoDeId', 'eventosPropuestos', 'asuntoIds', 'createdAt', 'updatedAt'])
+          && request.resource.data.nombreOriginal is string && request.resource.data.nombreOriginal.size() <= 300
+          && textoOpcional('storagePath', 2000)
+          && textoOpcional('mimeType', 200)
+          && numeroOpcional('sizeBytes')
+          && textoOpcional('categoria', 60)
+          && textoOpcional('estado', 60)
+          && textoOpcional('modoAnalisis', 20)
+          && textoOpcional('resumen', 4000)
+          && textoOpcional('duplicadoDeId', 200)
+          && listaOpcional('eventosPropuestos')
+          && listaOpcional('asuntoIds');
 
         match /campos/{fieldId} {
-          allow read, write: if esPropietario(uid);
+          allow read, delete: if esPropietario(uid);
+          allow write: if esPropietario(uid)
+            && request.resource.data.keys().hasOnly(['clave', 'etiqueta', 'valor', 'confianza', 'estado', 'origen'])
+            && request.resource.data.clave is string
+            && request.resource.data.etiqueta is string
+            && request.resource.data.valor is string && request.resource.data.valor.size() <= 2000
+            && numeroOpcional('confianza')
+            && textoOpcional('estado', 30)
+            && textoOpcional('origen', 20);
         }
       }
 
       match /eventos/{eventId} {
-        allow read, write: if esPropietario(uid);
+        allow read, delete: if esPropietario(uid);
+        allow write: if esPropietario(uid)
+          && request.resource.data.keys().hasOnly(['titulo', 'documentoId', 'asuntoId', 'notas', 'tipoEvento', 'fecha', 'tipoFecha', 'prioridad', 'estado', 'createdAt'])
+          && request.resource.data.titulo is string && request.resource.data.titulo.size() <= 300
+          && textoOpcional('documentoId', 200)
+          && textoOpcional('asuntoId', 200)
+          && textoOpcional('notas', 2000)
+          && request.resource.data.tipoEvento is string
+          && request.resource.data.fecha is timestamp
+          && request.resource.data.tipoFecha is string
+          && request.resource.data.prioridad is string
+          && request.resource.data.estado is string;
       }
 
       match /asuntos/{asuntoId} {
-        allow read, create, delete: if esPropietario(uid);
-        allow update: if esPropietario(uid) && noCierraSinCriterio();
+        allow read, delete: if esPropietario(uid);
+
+        allow create: if esPropietario(uid)
+          && request.resource.data.keys().hasOnly(['titulo', 'tipo', 'objetivo', 'estado', 'prioridad', 'bloqueoMotivo', 'criterioCierre', 'cerradoEn', 'createdAt', 'updatedAt'])
+          && request.resource.data.titulo is string && request.resource.data.titulo.size() <= 300
+          && request.resource.data.tipo is string;
+
+        allow update: if esPropietario(uid) && noCierraSinCriterio()
+          && request.resource.data.keys().hasOnly(['titulo', 'tipo', 'objetivo', 'estado', 'prioridad', 'bloqueoMotivo', 'criterioCierre', 'cerradoEn', 'createdAt', 'updatedAt'])
+          && textoOpcional('objetivo', 2000)
+          && textoOpcional('bloqueoMotivo', 2000)
+          && textoOpcional('criterioCierre', 2000);
 
         match /documentos/{docId} {
-          allow read, write: if esPropietario(uid);
+          allow read, delete: if esPropietario(uid);
+          allow write: if esPropietario(uid)
+            && request.resource.data.keys().hasOnly(['rol', 'nombreArchivo'])
+            && request.resource.data.rol is string
+            && textoOpcional('nombreArchivo', 300);
         }
 
         match /actividad/{actId} {
-          allow read, write: if esPropietario(uid);
+          allow read: if esPropietario(uid);
+          allow create: if esPropietario(uid)
+            && request.resource.data.keys().hasOnly(['tipo', 'descripcion', 'metadata', 'createdAt'])
+            && request.resource.data.tipo is string
+            && request.resource.data.descripcion is string && request.resource.data.descripcion.size() <= 1000
+            && mapaOpcional('metadata');
         }
       }
 
       match /conversaciones/{convId} {
-        allow read, write: if esPropietario(uid);
+        allow read, delete: if esPropietario(uid);
+        allow write: if esPropietario(uid)
+          && request.resource.data.keys().hasOnly(['titulo', 'createdAt', 'updatedAt'])
+          && textoOpcional('titulo', 300);
 
         match /mensajes/{msgId} {
-          allow read, write: if esPropietario(uid);
+          allow read: if esPropietario(uid);
+          allow create: if esPropietario(uid)
+            && request.resource.data.keys().hasOnly(['rol', 'contenido', 'esDemo', 'confiado', 'fuentes', 'createdAt'])
+            && request.resource.data.rol in ['user', 'assistant']
+            && request.resource.data.contenido is string && request.resource.data.contenido.size() <= 8000
+            && listaOpcional('fuentes');
         }
       }
     }
