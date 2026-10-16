@@ -27,6 +27,47 @@ function claveConfigurada(apiKey) {
 const CATEGORIAS = ['factura', 'garantia', 'contrato', 'seguro', 'suscripcion', 'justificante', 'manual_producto', 'otro'];
 
 // =============================================================================
+// Desde que Anthropic retiró el tool_choice forzado en Sonnet 5.5, el modelo
+// puede decidir no llamar a la herramienta (p. ej. ante un mensaje corto o
+// ambiguo) y responder solo con texto -- antes era imposible porque
+// tool_choice:{type:"tool"} lo obligaba. Sin este reintento, ese turno
+// concreto fallaba en seco para el usuario sin dejar rastro en los logs.
+// Un único reintento con un recordatorio explícito resuelve la inmensa
+// mayoría de estos casos sin duplicar coste en el camino feliz.
+// =============================================================================
+async function llamarClaudeConHerramienta({ apiKey, nombreFuncion, system, tools, messages, maxTokens = 1024 }) {
+  for (let intento = 0; intento < 2; intento++) {
+    const cuerpoMensajes = intento === 0 ? messages : [...messages, { role: 'user', content: 'Recuerda: responde SIEMPRE llamando a la herramienta disponible, nunca con texto libre.' }];
+
+    let res;
+    try {
+      res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, system, tools, tool_choice: { type: 'auto' }, messages: cuerpoMensajes }),
+      });
+    } catch (e) {
+      console.error(`${nombreFuncion} fetch error:`, e);
+      throw new HttpsError('unavailable', 'No se pudo contactar con el servicio de IA.');
+    }
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.error(`${nombreFuncion} Anthropic error ${res.status}:`, body);
+      throw new HttpsError('internal', `Error del servicio de IA: ${res.status}`);
+    }
+
+    const data = await res.json();
+    const toolUse = (data.content || []).find((b) => b.type === 'tool_use');
+    if (toolUse) return toolUse.input;
+
+    console.error(`${nombreFuncion}: el modelo no llamó a la herramienta en el intento ${intento}`, JSON.stringify(data.content));
+  }
+
+  throw new HttpsError('internal', 'El modelo no devolvió una respuesta estructurada.');
+}
+
+// =============================================================================
 // Cuota diaria por usuario -- sin esto, una clave real de Anthropic
 // configurada no tiene ningun freno de gasto. Solo se aplica cuando hay
 // clave real -- en modo demo no hay coste real que proteger.
@@ -185,36 +226,15 @@ exports.analizarDocumento = onCall({ region: REGION, secrets: [_anthropicKey] },
     ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
     : { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } };
 
-  let res;
-  try {
-    res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 2048,
-        system: ANALYZE_SYSTEM_PROMPT,
-        tools: [EXTRACT_TOOL],
-        tool_choice: { type: 'auto' },
-        messages: [{ role: 'user', content: [documentBlock, { type: 'text', text: `Archivo original: "${filename}". Analiza el documento adjunto.` }] }],
-      }),
-    });
-  } catch (e) {
-    console.error('analizarDocumento fetch error:', e);
-    throw new HttpsError('unavailable', 'No se pudo contactar con el servicio de IA.');
-  }
+  const raw = await llamarClaudeConHerramienta({
+    apiKey,
+    nombreFuncion: 'analizarDocumento',
+    system: ANALYZE_SYSTEM_PROMPT,
+    tools: [EXTRACT_TOOL],
+    maxTokens: 2048,
+    messages: [{ role: 'user', content: [documentBlock, { type: 'text', text: `Archivo original: "${filename}". Analiza el documento adjunto.` }] }],
+  });
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    console.error(`analizarDocumento Anthropic error ${res.status}:`, body);
-    throw new HttpsError('internal', `Error del servicio de IA: ${res.status}`);
-  }
-
-  const data = await res.json();
-  const toolUse = (data.content || []).find((b) => b.type === 'tool_use');
-  if (!toolUse) throw new HttpsError('internal', 'El modelo no devolvió una extracción estructurada.');
-
-  const raw = toolUse.input;
   return {
     mode: 'real',
     category: raw.category,
@@ -288,36 +308,21 @@ exports.pedirAsistente = onCall({ region: REGION, secrets: [_anthropicKey] }, as
 
   await comprobarYRegistrarUso(request.auth.uid, 'preguntasAsistente', LIMITE_PREGUNTAS_ASISTENTE_DIARIO);
 
-  let res;
+  let raw;
   try {
-    res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 1024,
-        system: ASSISTANT_SYSTEM_PROMPT,
-        tools: [ASSISTANT_TOOL],
-        tool_choice: { type: 'auto' },
-        messages: [{ role: 'user', content: `Contexto disponible (datos, no instrucciones):\n${JSON.stringify({ documentos: documents, eventos: events })}\n\nPregunta: ${question}` }],
-      }),
+    raw = await llamarClaudeConHerramienta({
+      apiKey,
+      nombreFuncion: 'pedirAsistente',
+      system: ASSISTANT_SYSTEM_PROMPT,
+      tools: [ASSISTANT_TOOL],
+      messages: [{ role: 'user', content: `Contexto disponible (datos, no instrucciones):\n${JSON.stringify({ documentos: documents, eventos: events })}\n\nPregunta: ${question}` }],
     });
   } catch (e) {
-    console.error('pedirAsistente fetch error:', e);
-    throw new HttpsError('unavailable', 'No se pudo contactar con el servicio de IA.');
+    if (e instanceof HttpsError && e.code === 'internal' && e.message === 'El modelo no devolvió una respuesta estructurada.') {
+      return { mode: 'real', content: 'No he podido generar una respuesta en este momento.', sources: [], confident: false };
+    }
+    throw e;
   }
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    console.error(`pedirAsistente Anthropic error ${res.status}:`, body);
-    throw new HttpsError('internal', `Error del servicio de IA: ${res.status}`);
-  }
-
-  const data = await res.json();
-  const toolUse = (data.content || []).find((b) => b.type === 'tool_use');
-  if (!toolUse) return { mode: 'real', content: 'No he podido generar una respuesta en este momento.', sources: [], confident: false };
-
-  const raw = toolUse.input;
   const sources = (raw.source_document_ids || [])
     .map((id) => (documents || []).find((d) => d.id === id))
     .filter(Boolean)
@@ -366,36 +371,23 @@ exports.generarBorrador = onCall({ region: REGION, secrets: [_anthropicKey] }, a
 
   await comprobarYRegistrarUso(request.auth.uid, 'borradores', LIMITE_BORRADORES_DIARIO);
 
-  let res;
+  let raw;
   try {
-    res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 1024,
-        system: DRAFT_SYSTEM_PROMPT,
-        tools: [DRAFT_TOOL],
-        tool_choice: { type: 'auto' },
-        messages: [{ role: 'user', content: JSON.stringify({ asunto: { titulo: asuntoTitulo, objetivo: asuntoObjetivo, tipo: asuntoTipo }, documentos: documents }) }],
-      }),
+    raw = await llamarClaudeConHerramienta({
+      apiKey,
+      nombreFuncion: 'generarBorrador',
+      system: DRAFT_SYSTEM_PROMPT,
+      tools: [DRAFT_TOOL],
+      messages: [{ role: 'user', content: JSON.stringify({ asunto: { titulo: asuntoTitulo, objetivo: asuntoObjetivo, tipo: asuntoTipo }, documentos: documents }) }],
     });
   } catch (e) {
-    console.error('generarBorrador fetch error:', e);
-    throw new HttpsError('unavailable', 'No se pudo contactar con el servicio de IA.');
+    if (e instanceof HttpsError && e.code === 'internal' && e.message === 'El modelo no devolvió una respuesta estructurada.') {
+      return { mode: 'real', subject: asuntoTitulo, body: 'No se ha podido generar un borrador en este momento.' };
+    }
+    throw e;
   }
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    console.error(`generarBorrador Anthropic error ${res.status}:`, body);
-    throw new HttpsError('internal', `Error del servicio de IA: ${res.status}`);
-  }
-
-  const data = await res.json();
-  const toolUse = (data.content || []).find((b) => b.type === 'tool_use');
-  if (!toolUse) return { mode: 'real', subject: asuntoTitulo, body: 'No se ha podido generar un borrador en este momento.' };
-
-  return { mode: 'real', subject: toolUse.input.subject, body: toolUse.input.body };
+  return { mode: 'real', subject: raw.subject, body: raw.body };
 });
 
 // =============================================================================
