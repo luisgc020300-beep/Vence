@@ -111,7 +111,7 @@ const EXTRACT_TOOL = {
             key: { type: 'string' },
             label: { type: 'string' },
             value: { type: 'string' },
-            confidence: { type: 'number', minimum: 0, maximum: 1 },
+            confidence: { type: 'number', description: 'Número entre 0 y 1.' },
           },
           required: ['key', 'label', 'value', 'confidence'],
         },
